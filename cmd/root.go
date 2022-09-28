@@ -16,21 +16,22 @@ import (
 	"github.com/spf13/viper"
 )
 
-var cfgFile string
+var rootCmdArgs struct {
+	ConfigFile string
+	Release    string
+	Namespace  string
+}
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "spt-util",
+	Use:   config.AppName,
 	Short: "the SPT utility application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Long: `
+The SPT utility application.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+This application is used to execute the various scripts necessary to setup
+and maintain SPT demo environments.
+	`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,11 +46,12 @@ func Execute() {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.spt-util.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.ConfigFile, "config", "c",
+		"", "specify the config file (default is ./config/"+config.AppName+".yaml)")
+	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.Release, "release", "r",
+		"inspire", "set the inspire release name used")
+	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.Namespace, "namespace", "n",
+		"default", "set the cluster namespace to target")
 
 	rootCmd.Version = config.AppVersion().String()     // Enable the version option
 	rootCmd.CompletionOptions.DisableDefaultCmd = true // Hide the completion options
@@ -57,18 +59,13 @@ func init() {
 
 // initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" {
+	if rootCmdArgs.ConfigFile != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
+		viper.SetConfigFile(rootCmdArgs.ConfigFile)
 	} else {
-		// Find home directory.
-		home, err := os.UserHomeDir()
-		cobra.CheckErr(err)
-
-		// Search config in home directory with name ".spt-util" (without extension).
-		viper.AddConfigPath(home)
+		viper.AddConfigPath("./config")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(".spt-util")
+		viper.SetConfigName(config.AppName)
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -76,5 +73,13 @@ func initConfig() {
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
 		_, _ = fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+	}
+
+	// Override config file settings with command line arguments, if present
+	if rootCmdArgs.Release != "" {
+		viper.Set(config.GlobalReleaseKey, rootCmdArgs.Release)
+	}
+	if rootCmdArgs.Namespace != "" {
+		viper.Set(config.GlobalNamespaceKey, rootCmdArgs.Namespace)
 	}
 }

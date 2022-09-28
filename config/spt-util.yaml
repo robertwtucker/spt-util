@@ -1,0 +1,6 @@
+global:
+  release: "inspire"
+  namespace: "default"
+demo:
+  init:
+    foo: "blah"

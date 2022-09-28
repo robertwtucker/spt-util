@@ -30,3 +30,8 @@ func AppVersion() VersionInfo { return VersionInfo{Version: appVersion, Revision
 func (v VersionInfo) String() string {
 	return fmt.Sprintf("%s-%s", v.Version, v.Revision)
 }
+
+const (
+	GlobalReleaseKey   = "global.release"
+	GlobalNamespaceKey = "global.namespace"
+)
