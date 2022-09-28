@@ -9,6 +9,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/robertwtucker/spt-util/internal/config"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -20,7 +21,7 @@ var cfgFile string
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "spt-util",
-	Short: "A brief description of your application",
+	Short: "the SPT utility application",
 	Long: `A longer description that spans multiple lines and likely contains
 examples and usage of using your application. For example:
 
@@ -50,9 +51,8 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.spt-util.yaml)")
 
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	rootCmd.Version = config.AppVersion().String()     // Enable the version option
+	rootCmd.CompletionOptions.DisableDefaultCmd = true // Hide the completion options
 }
 
 // initConfig reads in config file and ENV variables if set.
@@ -75,6 +75,6 @@ func initConfig() {
 
 	// If a config file is found, read it in.
 	if err := viper.ReadInConfig(); err == nil {
-		fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
+		_, _ = fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 }
