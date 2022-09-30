@@ -32,6 +32,11 @@ func (v VersionInfo) String() string {
 }
 
 const (
-	GlobalReleaseKey   = "global.release"
-	GlobalNamespaceKey = "global.namespace"
+	GlobalReleaseKey     = "global.release"
+	GlobalNamespaceKey   = "global.namespace"
+	DemoUsernameKey      = "demo.username"
+	DemoPasswordKey      = "demo.password"
+	DemoInitEnvFileKey   = "demo.init.envFile"
+	DemoInitChsFileKey   = "demo.init.chsFile"
+	DemoInitWorkflowsKey = "demo.init.workflows"
 )
