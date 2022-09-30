@@ -9,15 +9,21 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/robertwtucker/spt-util/internal/config"
+	"log"
 	"os"
+	"strings"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var rootCmdArgs struct {
 	ConfigFile string
+	LogFormat  string
+	LogDebug   bool
 	Release    string
 	Namespace  string
 }
@@ -32,6 +38,13 @@ The SPT utility application.
 This application is used to execute the various scripts necessary to setup
 and maintain SPT demo environments.
 	`,
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		if err := initLog(); err != nil {
+			return errors.Wrapf(err, "failed to initialize logging")
+		}
+		logrus.WithField("version", config.AppVersion().String()).Debug("initialized")
+		return nil
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -48,6 +61,10 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.ConfigFile, "config", "c",
 		"", "specify the config file (default is ./config/"+config.AppName+".yaml)")
+	rootCmd.PersistentFlags().StringVar(&rootCmdArgs.LogFormat, "log-format",
+		"text", "set the logging format [text|json]")
+	rootCmd.PersistentFlags().BoolVarP(&rootCmdArgs.LogDebug, "verbose", "v",
+		false, "set verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.Release, "release", "r",
 		"inspire", "set the inspire release name used")
 	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.Namespace, "namespace", "n",
@@ -82,4 +99,19 @@ func initConfig() {
 	if rootCmdArgs.Namespace != "" {
 		viper.Set(config.GlobalNamespaceKey, rootCmdArgs.Namespace)
 	}
+}
+
+func initLog() error {
+	if strings.ToLower(rootCmdArgs.LogFormat) == "json" {
+		logrus.SetFormatter(&logrus.JSONFormatter{})
+	}
+	if rootCmdArgs.LogDebug {
+		logrus.SetLevel(logrus.DebugLevel)
+	} else {
+		logrus.SetLevel(logrus.InfoLevel)
+	}
+	log.SetOutput(logrus.New().Writer())
+	log.SetFlags(0)
+
+	return nil
 }
