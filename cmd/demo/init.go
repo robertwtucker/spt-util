@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/go-http-utils/headers"
+	"github.com/pkg/errors"
 	"github.com/robertwtucker/spt-util/internal/config"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -65,6 +66,8 @@ type WorkflowsResponse struct {
 func executeInit() {
 	log.Info("starting demo environment initialization")
 
+	//
+	//  Setup
 	release := viper.GetString(config.GlobalReleaseKey)
 	log.WithField("release", release).Debug()
 	namespace := viper.GetString(config.GlobalNamespaceKey)
@@ -79,7 +82,8 @@ func executeInit() {
 	authHeader := fmt.Sprintf("Basic %s", authEncoding)
 	client := &http.Client{Timeout: time.Second * 2}
 
-	//  Import ICM Environment Variables
+	//
+	//  Import ICM environment variables
 	//  PUT {{baseUrl}}/api/content/v1/inspireEnvironments
 	url := fmt.Sprintf("%s/%s", scalerHost, "api/content/v1/inspireEnvironments")
 	envFilePath := viper.GetString(config.DemoInitEnvFileKey)
@@ -114,7 +118,17 @@ func executeInit() {
 	}
 	log.Info("ICM environment settings imported successfully")
 
-	//  Import Changeset w/workflows for rest of process
+	//
+	//  Get starting list of Scaler workflows so we can know when the changeset is available
+	workflowsResponse, err := getWorkflows(client, scalerHost, authHeader)
+	if err != nil {
+		log.Fatal("error getting workflows: ", err)
+	}
+	startingWorkflowsCount := len(workflowsResponse.Workflows)
+	log.Debug("starting workflow count: ", startingWorkflowsCount)
+
+	//
+	//  Import changeset w/workflows for rest of process
 	//  {{baseUrl}}/api/content/v1/upload/changesets (multipart/form-data)
 	url = fmt.Sprintf("%s/%s", scalerHost, "api/content/v1/upload/changesets")
 	chsFilePath := viper.GetString(config.DemoInitChsFileKey)
@@ -142,39 +156,28 @@ func executeInit() {
 	}
 	log.Info("workflow changeset imported successfully")
 
-	//  Find required workflows
+	//
+	//  Find required workflows (loop until changeset is applied)
 	//  GET {{baseUrl}}/api/integration/v2/workflows/
-	url = fmt.Sprintf("%s/%s", scalerHost, "api/integration/v2/workflows")
-	// request
-	getWorkflowsRequest, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		log.Fatal("error creating get workflows request: ", err)
+	var currentWorkflowsCount = startingWorkflowsCount
+	var tries = 0
+	for {
+		if tries > 15 {
+			log.Fatal("Exceeded try count waiting for workflows")
+		}
+		if currentWorkflowsCount > startingWorkflowsCount {
+			log.Info("changeset workflows applied successfully")
+			break
+		}
+		time.Sleep(4 * time.Second)
+		workflowsResponse, err = getWorkflows(client, scalerHost, authHeader)
+		if err != nil {
+			log.Fatal("error getting workflows: ", err)
+		}
+		currentWorkflowsCount = len(workflowsResponse.Workflows)
+		log.Info("current workflow count: ", currentWorkflowsCount)
+		tries++
 	}
-	log.WithFields(log.Fields{
-		"method": getWorkflowsRequest.Method,
-		"url":    getWorkflowsRequest.URL,
-	}).Debug("created workflows request")
-	getWorkflowsRequest.Header.Set(headers.Authorization, authHeader)
-	// response
-	log.Info("sending workflows request")
-	getWorkflowsResponse, err := client.Do(getWorkflowsRequest)
-	if err != nil {
-		log.Fatal("error sending workflows request: ", err)
-	}
-	defer func() { _ = getWorkflowsResponse.Body.Close }()
-	// process
-	getWorkflowsResponseBody, _ := io.ReadAll(getWorkflowsResponse.Body)
-	if getWorkflowsResponse.StatusCode >= http.StatusBadRequest {
-		log.Fatal("error: workflows request returned non-ok status: ", getWorkflowsResponse.StatusCode, string(getWorkflowsResponseBody))
-	}
-	log.Info("list of workflows received successfully")
-
-	// Serialize the list of workflows from JSON
-	var workflowsResponse WorkflowsResponse
-	if err := json.Unmarshal(getWorkflowsResponseBody, &workflowsResponse); err != nil {
-		log.Fatal("error processing JSON from get workflows response: ", err)
-	}
-	log.Debug("# scaler workflows: ", len(workflowsResponse.Workflows))
 
 	// Find the IDs of the SPT workflows
 	targetWorkflows := viper.GetStringSlice(config.DemoInitWorkflowsKey)
@@ -201,8 +204,9 @@ func executeInit() {
 		log.Fatal("error: no workflows found to deploy!")
 	}
 
-	// Deploy the required workflows
-	// PATCH {{baseUrl}}/api/integration/v2/workflows/{id}/
+	//
+	//  Deploy the required workflows
+	//  PATCH {{baseUrl}}/api/integration/v2/workflows/{id}/
 	for _, id := range foundWorkflows {
 		url = fmt.Sprintf("%s/%s/%s", scalerHost, "api/integration/v2/workflows", id)
 		requestBody, _ := json.Marshal(map[string]string{"status": "DEPLOYED"})
@@ -224,11 +228,12 @@ func executeInit() {
 		if err != nil {
 			log.Fatal("error sending deploy workflow request: ", err)
 		}
-		_ = response.Body.Close()
 		// process
 		if response.StatusCode >= http.StatusBadRequest {
-			log.Error("error deploying scaler workflow: ", response.StatusCode, id)
+			respBody, _ := io.ReadAll(response.Body)
+			log.WithField("responseBody", string(respBody)).Error("error deploying scaler workflow")
 		}
+		_ = response.Body.Close()
 		log.WithField("id", id).Info("workflow deployed successfully")
 	}
 
@@ -237,6 +242,49 @@ func executeInit() {
 
 func getBasicAuthEncoding(user string, password string) string {
 	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", user, password)))
+}
+
+func getWorkflows(client *http.Client, scalerHost string, authHeader string) (WorkflowsResponse, error) {
+	//  List existing Scaler workflows
+	//  GET {{baseUrl}}/api/integration/v2/workflows/
+	url := fmt.Sprintf("%s/%s", scalerHost, "api/integration/v2/workflows")
+
+	// request
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		log.Error("error creating get workflows request: ", err)
+		return WorkflowsResponse{}, err
+	}
+	log.WithFields(log.Fields{
+		"method": request.Method,
+		"url":    request.URL,
+	}).Debug("created workflows request")
+	request.Header.Set(headers.Authorization, authHeader)
+
+	// response
+	log.Info("sending workflows request")
+	response, err := client.Do(request)
+	if err != nil {
+		log.Error("error sending workflows request: ", err)
+		return WorkflowsResponse{}, err
+	}
+	defer func() { _ = response.Body.Close }()
+
+	// process
+	responseBody, _ := io.ReadAll(response.Body)
+	if response.StatusCode >= http.StatusBadRequest {
+		log.WithField("responseBody", string(responseBody)).Error("error: workflows request returned non-ok status")
+		return WorkflowsResponse{}, errors.New(string(responseBody))
+	}
+	// Serialize the response from JSON
+	var workflowsResponse WorkflowsResponse
+	log.Info("list of workflows received successfully")
+	if err := json.Unmarshal(responseBody, &workflowsResponse); err != nil {
+		log.WithField("error", err).Error("error processing JSON from workflows response")
+		return WorkflowsResponse{}, err
+	}
+
+	return workflowsResponse, nil
 }
 
 func newFileUploadRequest(uri string, path string) (*http.Request, error) {
