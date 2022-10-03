@@ -1,4 +1,4 @@
-FROM golang:1.19-bullseye AS build-env
+FROM golang:1.19 AS build-env
 
 ARG BUILD_VERSION=development
 ARG BUILD_REVISION=unknown
@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags \
   "-X ${PROJECT}/internal/config.appVersion=${BUILD_VERSION} -X ${PROJECT}/internal/config.revision=${BUILD_REVISION}" \
-  -o /go/bin/app ./main.go
+  -o /go/bin/app
 
 FROM gcr.io/distroless/static
 
