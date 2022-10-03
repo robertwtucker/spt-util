@@ -90,12 +90,12 @@ func executeInit() {
 	log.WithField("envFilePath", envFilePath).Debug("reading environment file content")
 	envFileContent, err := os.ReadFile(envFilePath)
 	if err != nil {
-		log.Fatal("error reading environment file:", err)
+		log.Fatalf("error reading environment file: %s", err)
 	}
 	// request
 	importEnvRequest, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(envFileContent))
 	if err != nil {
-		log.Fatal("error creating import environment request:", err)
+		log.Fatalf("error creating import environment request: %s", err)
 	}
 	log.WithFields(log.Fields{
 		"method": importEnvRequest.Method,
@@ -108,13 +108,15 @@ func executeInit() {
 	log.Info("importing ICM environment settings")
 	importEnvResponse, err := client.Do(importEnvRequest)
 	if err != nil {
-		log.Fatal("error sending import environment request:", err)
+		log.Fatalf("error sending import environment request: %s", err)
 	}
 	defer func() { _ = importEnvResponse.Body.Close }()
 	// process
 	if importEnvResponse.StatusCode >= http.StatusBadRequest {
 		respBody, _ := io.ReadAll(importEnvResponse.Body)
-		log.Fatal("error: import env request returned non-ok status:", importEnvResponse.StatusCode, string(respBody))
+		log.Fatalf("error: import env request returned non-ok status: %d-%s",
+			importEnvResponse.StatusCode, string(respBody),
+		)
 	}
 	log.Info("ICM environment settings imported successfully")
 
@@ -122,10 +124,10 @@ func executeInit() {
 	//  Get starting list of Scaler workflows so we can know when the changeset is available
 	workflowsResponse, err := getWorkflows(client, scalerHost, authHeader)
 	if err != nil {
-		log.Fatal("error getting workflows: ", err)
+		log.Fatalf("error getting workflows: %s", err)
 	}
 	startingWorkflowsCount := len(workflowsResponse.Workflows)
-	log.Debug("starting workflow count: ", startingWorkflowsCount)
+	log.Debugf("starting workflow count: %s", startingWorkflowsCount)
 
 	//
 	//  Import changeset w/workflows for rest of process
@@ -135,7 +137,7 @@ func executeInit() {
 	// request
 	importChangesetRequest, err := newFileUploadRequest(url, chsFilePath)
 	if err != nil {
-		log.Fatal("error creating import changeset request:", err)
+		log.Fatalf("error creating import changeset request: %s", err)
 	}
 	log.WithFields(log.Fields{
 		"method": importChangesetRequest.Method,
@@ -146,13 +148,13 @@ func executeInit() {
 	log.Info("sending import changeset request")
 	importChangesetResponse, err := client.Do(importChangesetRequest)
 	if err != nil {
-		log.Fatal("error sending import changeset request:", err)
+		log.Fatalf("error sending import changeset request: %s", err)
 	}
 	defer func() { _ = importChangesetResponse.Body.Close }()
 	// process
 	if importChangesetResponse.StatusCode >= http.StatusBadRequest {
 		respBody, _ := io.ReadAll(importChangesetResponse.Body)
-		log.Fatal("error: import changeset request returned non-ok status: ", string(respBody))
+		log.Fatalf("error: import changeset request returned non-ok status: %s", string(respBody))
 	}
 	log.Info("workflow changeset imported successfully")
 
@@ -172,10 +174,10 @@ func executeInit() {
 		time.Sleep(4 * time.Second)
 		workflowsResponse, err = getWorkflows(client, scalerHost, authHeader)
 		if err != nil {
-			log.Fatal("error getting workflows: ", err)
+			log.Fatalf("error getting workflows: %s", err)
 		}
 		currentWorkflowsCount = len(workflowsResponse.Workflows)
-		log.Info("current workflow count: ", currentWorkflowsCount)
+		log.Infof("current workflow count: %d", currentWorkflowsCount)
 		tries++
 	}
 
@@ -213,7 +215,7 @@ func executeInit() {
 		// request
 		request, err := http.NewRequest(http.MethodPatch, url, bytes.NewBuffer(requestBody))
 		if err != nil {
-			log.Fatal("error creating workflow deployment request ", err)
+			log.Fatalf("error creating workflow deployment request %s", err)
 		}
 		log.WithFields(log.Fields{
 			"method": request.Method,
@@ -226,7 +228,7 @@ func executeInit() {
 		log.WithField("id", id).Info("sending workflow deployment request")
 		response, err := client.Do(request)
 		if err != nil {
-			log.Fatal("error sending deploy workflow request: ", err)
+			log.Fatalf("error sending deploy workflow request: %s", err)
 		}
 		// process
 		if response.StatusCode >= http.StatusBadRequest {
