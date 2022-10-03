@@ -46,12 +46,12 @@ func executeStage() {
 		log.Fatal("error getting config file values")
 	}
 
-	log.Debugf("file sets to process: %d", len(files))
+	log.Infof("file(s) to process: %d", len(files))
 	for _, f := range files {
 		log.WithFields(log.Fields{
 			"src":  f.Source,
 			"dest": f.Destination,
-		}).Debug("copying file")
+		}).Info("copying file")
 
 		err := cp.Copy(f.Source, f.Destination)
 		if err != nil {
