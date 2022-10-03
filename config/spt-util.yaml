@@ -4,11 +4,13 @@ global:
 demo:
   username: "system"
   password: "Password12345*"
-  import:
-    zipFile: "tmp/spt-loadProcess/step-3/sptDeployment_20220928.zip"
   init:
     envFile: "tmp/spt-loadProcess/step-1/variable_ICM_default.json"
     chsFile: "tmp/spt-loadProcess/step-2/SPT Import Processes.chs"
     workflows:
       - "SPT Content Import"
       - "SPT Import Handler"
+  stage:
+    files:
+      - src: "tmp/spt-loadProcess/step-3/"
+        dest: "/Users/r.tucker/Projects/k8s/data/spt-15.4/scaler-additional-storage/input"

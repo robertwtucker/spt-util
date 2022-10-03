@@ -24,6 +24,6 @@ Performs operations against a set of demo resources
 
 func init() {
 	demoCmd.AddCommand(demo.InitCmd)
-	// demoCmd.PersistentFlags().String("foo", "", "A help for foo")
+	demoCmd.AddCommand(demo.StageCmd)
 	rootCmd.AddCommand(demoCmd)
 }

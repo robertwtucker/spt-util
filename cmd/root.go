@@ -42,7 +42,7 @@ and maintain SPT demo environments.
 		if err := initLog(); err != nil {
 			return errors.Wrapf(err, "failed to initialize logging")
 		}
-		logrus.WithField("version", config.AppVersion().String()).Debug("initialized")
+		logrus.WithField("version", config.AppVersion().String()).Info("initialized")
 		return nil
 	},
 }

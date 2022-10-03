@@ -39,4 +39,5 @@ const (
 	DemoInitEnvFileKey   = "demo.init.envFile"
 	DemoInitChsFileKey   = "demo.init.chsFile"
 	DemoInitWorkflowsKey = "demo.init.workflows"
+	DemoStageFilesKey    = "demo.stage.files"
 )
