@@ -8,8 +8,6 @@
 package demo
 
 import (
-	"fmt"
-
 	cp "github.com/otiai10/copy"
 	"github.com/robertwtucker/spt-util/internal/config"
 	log "github.com/sirupsen/logrus"
@@ -25,7 +23,6 @@ var StageCmd = &cobra.Command{
 Stages resources for a demo instance
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("stage called")
 		executeStage()
 	},
 }
