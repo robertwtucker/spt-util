@@ -31,27 +31,20 @@ import (
 // InitCmd represents the init command
 var InitCmd = &cobra.Command{
 	Use:   "init",
-	Short: "initializes a demo instance",
+	Short: "Initializes a demo instance",
 	Long: `
 Initializes a demo instance given the specified release and namespace.
     `,
+	Example: `
+# initialize base content for a demo environment with debug logging enabled
+spt-util demo init -d
+	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		executeInit()
+		doInit()
 	},
 }
 
-func init() {
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// initCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// initCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
+func init() {}
 
 type WorkflowsResponse struct {
 	Workflows []struct {
@@ -63,7 +56,7 @@ type WorkflowsResponse struct {
 	} `json:"workflows"`
 }
 
-func executeInit() {
+func doInit() {
 	log.Info("starting demo environment initialization")
 
 	//

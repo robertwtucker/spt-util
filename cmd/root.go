@@ -31,12 +31,20 @@ var rootCmdArgs struct {
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   config.AppName,
-	Short: "the SPT utility application",
+	Short: "The SPT utility application",
 	Long: `
-The SPT utility application.
-
-This application is used to execute the various scripts necessary to setup
+The SPT utility application is used to execute the various scripts necessary to setup
 and maintain SPT demo environments.
+	`,
+	Example: `
+# initialize base content for a demo environment with debug logging enabled
+spt-util demo init -d
+
+# stage files in a demo environment using a custom configuration file
+spt-util demo stage -c <path-to-config.yaml>
+
+# display application version information
+spt-util --version
 	`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		if err := initLog(); err != nil {

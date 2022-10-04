@@ -16,9 +16,16 @@ import (
 // demoCmd represents the demo command
 var demoCmd = &cobra.Command{
 	Use:   "demo",
-	Short: "demo resource operations",
+	Short: "Operations with demo resources",
 	Long: `
 Performs operations against a set of demo resources
+	`,
+	Example: `
+# initialize base content for a demo environment with debug logging enabled
+spt-util demo init -d
+
+# stage files in a demo environment using a custom configuration file
+spt-util demo stage -c <path-to-config.yaml>
 	`,
 }
 

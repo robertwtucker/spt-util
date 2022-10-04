@@ -18,12 +18,17 @@ import (
 // StageCmd represents the stage command
 var StageCmd = &cobra.Command{
 	Use:   "stage",
-	Short: "stages demo resources",
+	Short: "Stages demo resources",
 	Long: `
-Stages resources for a demo instance
+Stages files and directories for a demo instance
+	`,
+	Example: `
+# stage files in a demo environment using a custom configuration file
+spt-util demo stage -c <path-to-config.yaml>
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		executeStage()
+		log.Debugf("release: %s", viper.GetString(config.GlobalReleaseKey))
+		doStage()
 	},
 }
 
@@ -34,7 +39,7 @@ type FilesToCopy struct {
 	Destination string `mapstructure:"dest"`
 }
 
-func executeStage() {
+func doStage() {
 	log.Info("starting demo environment file staging")
 
 	var files []FilesToCopy
