@@ -63,7 +63,7 @@ func init() {
 		"", "specify the config file (default is ./config/"+config.AppName+".yaml)")
 	rootCmd.PersistentFlags().StringVar(&rootCmdArgs.LogFormat, "log-format",
 		"text", "set the logging format [text|json]")
-	rootCmd.PersistentFlags().BoolVarP(&rootCmdArgs.LogDebug, "verbose", "v",
+	rootCmd.PersistentFlags().BoolVarP(&rootCmdArgs.LogDebug, "verbose", "d",
 		false, "set verbose logging")
 	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.Release, "release", "r",
 		"inspire", "set the inspire release name used")
