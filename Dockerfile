@@ -1,4 +1,4 @@
-FROM golang:1.19 AS build-env
+FROM golang:1.19-bullseye AS build-env
 
 ARG BUILD_VERSION=development
 ARG BUILD_REVISION=unknown
@@ -13,8 +13,9 @@ RUN CGO_ENABLED=0 go build -ldflags \
   "-X ${PROJECT}/internal/config.appVersion=${BUILD_VERSION} -X ${PROJECT}/internal/config.revision=${BUILD_REVISION}" \
   -o /go/bin/app
 
-FROM gcr.io/distroless/static
+FROM gcr.io/distroless/static-debian11
 
 COPY --from=build-env /go/bin/app /
+COPY config/spt-util.yaml /config/spt-util.yaml
 USER nonroot:nonroot
 CMD ["/app","--version"]
