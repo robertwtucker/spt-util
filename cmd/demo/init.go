@@ -66,7 +66,6 @@ func doInit() {
 	namespace := viper.GetString(config.GlobalNamespaceKey)
 	log.WithField("namespace", namespace).Debug()
 	scalerHost := fmt.Sprintf("http://%s-scaler.%s.svc.cluster.local", release, namespace)
-	scalerHost = "http://localhost:30600" // Temporary for testing
 	log.WithField("scalerHost", scalerHost).Info()
 	authEncoding := getBasicAuthEncoding(
 		viper.GetString(config.DemoUsernameKey),
