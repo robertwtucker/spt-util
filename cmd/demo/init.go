@@ -65,14 +65,14 @@ func doInit() {
 	log.WithField("release", release).Debug()
 	namespace := viper.GetString(config.GlobalNamespaceKey)
 	log.WithField("namespace", namespace).Debug()
-	scalerHost := fmt.Sprintf("http://%s-scaler.%s.svc.cluster.local", release, namespace)
+	scalerHost := viper.GetString(config.DemoServerKey)
 	log.WithField("scalerHost", scalerHost).Info()
 	authEncoding := getBasicAuthEncoding(
 		viper.GetString(config.DemoUsernameKey),
 		viper.GetString(config.DemoPasswordKey),
 	)
 	authHeader := fmt.Sprintf("Basic %s", authEncoding)
-	client := &http.Client{Timeout: time.Second * 2}
+	client := &http.Client{Timeout: time.Second * 5}
 
 	//
 	//  Import ICM environment variables

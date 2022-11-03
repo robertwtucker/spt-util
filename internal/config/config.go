@@ -37,6 +37,7 @@ const (
 	GlobalNamespaceKey   = "global.namespace"
 	DemoUsernameKey      = "demo.username"
 	DemoPasswordKey      = "demo.password"
+	DemoServerKey        = "demo.server"
 	DemoInitEnvFileKey   = "demo.init.envFile"
 	DemoInitChsFileKey   = "demo.init.chsFile"
 	DemoInitWorkflowsKey = "demo.init.workflows"
@@ -47,4 +48,5 @@ const (
 const (
 	DemoUsernameEnv = "SCALER_USER"
 	DemoPasswordEnv = "SCALER_PASS"
+	DemoServerEnv   = "SCALER_URL"
 )

@@ -31,9 +31,10 @@ spt-util demo stage -c <path-to-config.yaml>
 }
 
 func init() {
-	// Get Scaler user and password from environment, not command line
+	// Get Scaler params from environment, not command line
 	_ = viper.BindEnv(config.DemoUsernameKey, config.DemoUsernameEnv)
 	_ = viper.BindEnv(config.DemoPasswordKey, config.DemoPasswordEnv)
+	_ = viper.BindEnv(config.DemoServerKey, config.DemoServerEnv)
 
 	demoCmd.AddCommand(demo.InitCmd)
 	demoCmd.AddCommand(demo.StageCmd)
