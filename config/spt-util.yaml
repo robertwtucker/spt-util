@@ -10,5 +10,5 @@ demo:
       - "SPT Import Handler"
   stage:
     files:
-      - src: "/deployment/spt-base.zip"
-        dest: "/opt/scalerAdditionalStorage/input/spt-base.zip"
+      - src: "/deployment/base.zip"
+        dest: "/opt/scalerAdditionalStorage/input/sptDeploymentBase.zip"
