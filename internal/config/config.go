@@ -31,6 +31,7 @@ func (v VersionInfo) String() string {
 	return fmt.Sprintf("%s-%s", v.Version, v.Revision)
 }
 
+// Setting keys
 const (
 	GlobalReleaseKey     = "global.release"
 	GlobalNamespaceKey   = "global.namespace"
@@ -40,4 +41,10 @@ const (
 	DemoInitChsFileKey   = "demo.init.chsFile"
 	DemoInitWorkflowsKey = "demo.init.workflows"
 	DemoStageFilesKey    = "demo.stage.files"
+)
+
+// Environment variables
+const (
+	DemoUsernameEnv = "SCALER_USER"
+	DemoPasswordEnv = "SCALER_PASS"
 )

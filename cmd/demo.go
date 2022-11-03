@@ -9,8 +9,9 @@ package cmd
 
 import (
 	"github.com/robertwtucker/spt-util/cmd/demo"
-
+	"github.com/robertwtucker/spt-util/internal/config"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // demoCmd represents the demo command
@@ -30,6 +31,10 @@ spt-util demo stage -c <path-to-config.yaml>
 }
 
 func init() {
+	// Get Scaler user and password from environment, not command line
+	_ = viper.BindEnv(config.DemoUsernameKey, config.DemoUsernameEnv)
+	_ = viper.BindEnv(config.DemoPasswordKey, config.DemoPasswordEnv)
+
 	demoCmd.AddCommand(demo.InitCmd)
 	demoCmd.AddCommand(demo.StageCmd)
 	rootCmd.AddCommand(demoCmd)

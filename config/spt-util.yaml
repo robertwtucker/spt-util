@@ -2,15 +2,13 @@ global:
   release: "inspire"
   namespace: "default"
 demo:
-  username: "system"
-  password: "Password12345*"
   init:
-    envFile: "tmp/spt-loadProcess/step-1/variable_ICM_default.json"
-    chsFile: "tmp/spt-loadProcess/step-2/SPT Import Processes.chs"
+    envFile: "/deployment/icm_variables_default.json"
+    chsFile: "/deployment/spt_import_process.chs"
     workflows:
       - "SPT Content Import"
       - "SPT Import Handler"
   stage:
     files:
-      - src: "tmp/spt-loadProcess/step-3/"
-        dest: "/Users/r.tucker/Projects/k8s/data/spt-15.4/scaler-additional-storage/input"
+      - src: "/deployment/spt-base.zip"
+        dest: "/opt/scalerAdditionalStorage/input/spt-base.zip"
