@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 go build -ldflags \
   "-X ${PROJECT}/internal/config.appVersion=${BUILD_VERSION} -X ${PROJECT}/internal/config.revision=${BUILD_REVISION}" \
   -o /go/bin/app
 
-FROM redhat/ubi8-minimal:8.6
+FROM redhat/ubi8-minimal:8.7
 
 COPY --from=build-env /go/bin/app /
 COPY config/spt-util.yaml /config/spt-util.yaml
