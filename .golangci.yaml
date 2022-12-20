@@ -33,7 +33,7 @@ linters:
   disable-all: true
   enable:
     - goimports
-    - revive
+    - errcheck
     - ineffassign
     - goconst
     - staticcheck
