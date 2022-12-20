@@ -119,7 +119,7 @@ func doInit() {
 		log.Fatalf("error getting workflows: %s", err)
 	}
 	startingWorkflowsCount := len(workflowsResponse.Workflows)
-	log.Debugf("starting workflow count: %s", startingWorkflowsCount)
+	log.Debugf("starting workflow count: %d", startingWorkflowsCount)
 
 	//
 	//  Import changeset w/workflows for rest of process
