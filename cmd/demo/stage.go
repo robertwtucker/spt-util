@@ -15,7 +15,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// StageCmd represents the stage command
+// StageCmd represents the stage command.
 var StageCmd = &cobra.Command{
 	Use:   "stage",
 	Short: "Stages demo resources",
@@ -31,8 +31,6 @@ spt-util demo stage -c <path-to-config.yaml>
 		doStage()
 	},
 }
-
-func init() {}
 
 type FilesToCopy struct {
 	Source      string `mapstructure:"src"`
@@ -55,7 +53,7 @@ func doStage() {
 			"dest": f.Destination,
 		}).Info("copying file")
 
-		err := cp.Copy(f.Source, f.Destination)
+		err = cp.Copy(f.Source, f.Destination)
 		if err != nil {
 			log.Fatalf("error copying file: %s", err)
 		}

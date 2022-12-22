@@ -9,6 +9,7 @@ package demo
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -28,7 +29,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// InitCmd represents the init command
+// InitCmd represents the init command.
 var InitCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initializes a demo instance",
@@ -44,8 +45,6 @@ spt-util demo init -d
 	},
 }
 
-func init() {}
-
 type WorkflowsResponse struct {
 	Workflows []struct {
 		ID            string `json:"id"`
@@ -56,6 +55,9 @@ type WorkflowsResponse struct {
 	} `json:"workflows"`
 }
 
+// TODO: Refactor long function.
+//
+//nolint:funlen,gocognit,gomnd,noctx	// See: https://github.com/robertwtucker/spt-util/issues/11
 func doInit() {
 	log.Info("starting demo environment initialization")
 
@@ -106,6 +108,7 @@ func doInit() {
 	// process
 	if importEnvResponse.StatusCode >= http.StatusBadRequest {
 		respBody, _ := io.ReadAll(importEnvResponse.Body)
+		//nolint:gocritic // suppress lint error
 		log.Fatalf("error: import env request returned non-ok status: %d-%s",
 			importEnvResponse.StatusCode, string(respBody),
 		)
@@ -205,6 +208,7 @@ func doInit() {
 		url = fmt.Sprintf("%s/%s/%s", scalerHost, "api/integration/v2/workflows", id)
 		requestBody, _ := json.Marshal(map[string]string{"status": "DEPLOYED"})
 		// request
+		//nolint:govet	// request is new assignment
 		request, err := http.NewRequest(http.MethodPatch, url, bytes.NewBuffer(requestBody))
 		if err != nil {
 			log.Fatalf("error creating workflow deployment request %s", err)
@@ -244,7 +248,7 @@ func getWorkflows(client *http.Client, scalerHost string, authHeader string) (Wo
 	url := fmt.Sprintf("%s/%s", scalerHost, "api/integration/v2/workflows")
 
 	// request
-	request, err := http.NewRequest(http.MethodGet, url, nil)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
 	if err != nil {
 		log.Error("error creating get workflows request: ", err)
 		return WorkflowsResponse{}, err
@@ -273,7 +277,7 @@ func getWorkflows(client *http.Client, scalerHost string, authHeader string) (Wo
 	// Serialize the response from JSON
 	var workflowsResponse WorkflowsResponse
 	log.Info("list of workflows received successfully")
-	if err := json.Unmarshal(responseBody, &workflowsResponse); err != nil {
+	if err = json.Unmarshal(responseBody, &workflowsResponse); err != nil {
 		log.WithField("error", err).Error("error processing JSON from workflows response")
 		return WorkflowsResponse{}, err
 	}
@@ -296,14 +300,14 @@ func newFileUploadRequest(uri string, path string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = io.Copy(part, file)
+	_, _ = io.Copy(part, file)
 
 	err = writer.Close()
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, uri, body)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, uri, body)
 	req.Header.Set(headers.ContentType, writer.FormDataContentType())
 	return req, err
 }
