@@ -9,12 +9,11 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/robertwtucker/spt-util/internal/config"
 	"log"
 	"os"
 	"strings"
 
+	"github.com/robertwtucker/spt-util/internal/config"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -28,7 +27,7 @@ var rootCmdArgs struct {
 	Namespace  string
 }
 
-// rootCmd represents the base command when called without any subcommands
+// rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
 	Use:   config.AppName,
 	Short: "The SPT utility application",
@@ -47,9 +46,7 @@ spt-util demo stage -c <path-to-config.yaml>
 spt-util --version
 	`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		if err := initLog(); err != nil {
-			return errors.Wrapf(err, "failed to initialize logging")
-		}
+		initLog()
 		logrus.WithField("version", config.AppVersion().String()).Info("initialized")
 		return nil
 	},
@@ -64,6 +61,7 @@ func Execute() {
 	}
 }
 
+//nolint:gochecknoinits // required for proper cobra initialization
 func init() {
 	cobra.OnInitialize(initConfig)
 
@@ -100,7 +98,7 @@ func initConfig() {
 		_, _ = fmt.Fprintln(os.Stderr, "Using config file:", viper.ConfigFileUsed())
 	}
 
-	// Override config file settings with command line arguments, if present
+	// Override config file settings with command line arguments, if present.
 	if rootCmdArgs.Release != "" {
 		viper.Set(config.GlobalReleaseKey, rootCmdArgs.Release)
 	}
@@ -109,7 +107,7 @@ func initConfig() {
 	}
 }
 
-func initLog() error {
+func initLog() {
 	if strings.ToLower(rootCmdArgs.LogFormat) == "json" {
 		logrus.SetFormatter(&logrus.JSONFormatter{})
 	}
@@ -120,6 +118,4 @@ func initLog() error {
 	}
 	log.SetOutput(logrus.New().Writer())
 	log.SetFlags(0)
-
-	return nil
 }

@@ -5,12 +5,14 @@
 // 'LICENSE' file found in the root of this source code package.
 //
 
-package cmd
+package cmd_test
 
 import (
 	"testing"
+
+	"github.com/robertwtucker/spt-util/cmd"
 )
 
 func TestRoot(t *testing.T) {
-	Execute()
+	cmd.Execute()
 }

@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-// demoCmd represents the demo command
+// demoCmd represents the demo command.
 var demoCmd = &cobra.Command{
 	Use:   "demo",
 	Short: "Operations with demo resources",
@@ -30,6 +30,7 @@ spt-util demo stage -c <path-to-config.yaml>
 	`,
 }
 
+//nolint:gochecknoinits // required for proper cobra initialization.
 func init() {
 	// Get Scaler params from environment, not command line
 	_ = viper.BindEnv(config.DemoUsernameKey, config.DemoUsernameEnv)
