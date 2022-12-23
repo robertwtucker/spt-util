@@ -6,18 +6,11 @@ GO_FILES=$(shell find . -type f -name '*.go' -not -path './vendor/*')
 
 VERSION=$(shell git describe --tags --always | sed 's/v//;s/-.*//')
 REVISION=$(shell git rev-parse --short=7 HEAD)
-PACKAGE="github.com/robertwtucker/spt-util/internal/config"
+PACKAGE="${MODULE}/internal/config"
 BINARY=spt-util
+OUTPUT_DIR=out
+BUILD_OUTPUT=${OUTPUT_DIR}/bin/${BINARY}
 IMAGE="registry.sptcloud.com/spt/${BINARY}"
-
-OUTPUT_DIR=out/bin/${BINARY}
-
-ENV := local
-ifdef $$APP_ENV
-ENV := $$APP_ENV
-endif
-
-export PROJECT = github.com/robertwtucker/spt-util
 
 .PHONY: all test build vendor
 
@@ -27,30 +20,29 @@ all: help
 build:	## Build the project for Linux.
 	env GOOS=linux GOARCH=amd64 go build \
 		-ldflags "-X ${PACKAGE}.appVersion=${VERSION} -X ${PACKAGE}.revision=${REVISION}" \
-		-o ${OUTPUT_DIR} ./main.go
-	chmod +x ${OUTPUT_DIR}
+		-o ${BUILD_OUTPUT} ./main.go
+	chmod +x ${BUILD_OUTPUT}
 
 build-mac:	## Build the project for MacOS.
 	env GOOS=darwin GOARCH=amd64 go build \
 		-ldflags "-X ${PACKAGE}.appVersion=${VERSION} -X ${PACKAGE}.revision=${REVISION}" \
-		-o ${OUTPUT_DIR} ./main.go
-	chmod +x ${OUTPUT_DIR}
+		-o ${BUILD_OUTPUT} ./main.go
+	chmod +x ${BUILD_OUTPUT}
 
 build-win:	## Build the project for Windows.
 	env GOOS=windows GOARCH=amd64 go build \
 		-ldflags "-X ${PACKAGE}.appVersion=${VERSION} -X ${PACKAGE}.revision=${REVISION}" \
-		-o ${OUTPUT_DIR} ./main.go
+		-o ${BUILD_OUTPUT} ./main.go
 
 clean:	## Remove build-related files.
-	rm -rf ./bin
-	rm -rf ./out
+	rm -rf ./${OUTPUT_DIR}
 
 ## Run:
 run:	## Run the project from source.
 	go run ./main.go
 
 start:	## Run the project binary.
-	./${OUTPUT_DIR}
+	./${BUILD_OUTPUT}
 
 ## Test
 test:	## Run all of the project's tests.
