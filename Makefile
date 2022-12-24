@@ -64,7 +64,7 @@ docker:	## Build the Docker container.
 ## Test
 test:  ## Run all of the project's tests.
 	if ! hash go-test-report 2>/dev/null; then go install github.com/vakenbolt/go-test-report@latest; fi
-	go test -v -json ./... 2>&1 | go-test-report -o ${OUTPUT_DIR}/${TEST_REPORT}
+	go test -v ./... -json 2>&1 | go-test-report -o ${OUTPUT_DIR}/${TEST_REPORT}
 
 ## Dependencies:
 tidy:	## Run tidy and vendor to get the project's dependencies.
