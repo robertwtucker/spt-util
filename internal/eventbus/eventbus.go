@@ -83,7 +83,6 @@ func (eb *EventBus) PublishEvent(name string, data interface{}) {
 		for _, ec := range eventChannels {
 			ec <- event
 		}
-		wg.Done()
 	}(subscribers, Event{Data: data, Name: name, wg: &wg})
 
 	wg.Wait()
