@@ -64,6 +64,11 @@ func (eb *EventBus) getEventSubscribers(name string) eventChannelSlice {
 	return subscribers
 }
 
+// HasSubscribers returns true if the named Event has subscribers.
+func (eb *EventBus) HasSubscribers(name string) bool {
+	return len(eb.subscribers[name]) > 0
+}
+
 // PublishEvent sends data to all named Event subscribers. It waits
 // for all subscribers to finish (each must call Done() on Event).
 func (eb *EventBus) PublishEvent(name string, data interface{}) {
