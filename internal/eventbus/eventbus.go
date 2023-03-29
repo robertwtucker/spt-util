@@ -99,13 +99,12 @@ func (eb *EventBus) SubscribeEvent(name string) EventChannel {
 
 // SubscribeEventCallback registers a callback in response to an Event.
 func (eb *EventBus) SubscribeEventCallback(name string, callback CallbackFunction) {
-	ec := NewEventChannel()
-	eb.SubscribeEventChannel(ec, name)
+	ec := eb.SubscribeEvent(name)
 
 	go func(callback CallbackFunction) {
 		event := <-ec
+		defer event.Done()
 		callback(event.Name, event.Data)
-		event.Done()
 	}(callback)
 }
 
