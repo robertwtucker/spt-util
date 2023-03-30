@@ -1,4 +1,4 @@
-FROM golang:1.19-bullseye AS build-env
+FROM golang:1.20.2-bullseye AS build-env
 
 ARG VERSION=development
 ARG REVISION=unknown
@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 go build -ldflags \
   "-X ${PACKAGE}.appVersion=${VERSION} -X ${PACKAGE}.revision=${REVISION}" \
   -o /go/bin/app
 
-FROM redhat/ubi8-minimal:8.7
+FROM gcr.io/distroless/static
 
 COPY --from=build-env /go/bin/app /
 COPY config/spt-util.yaml /config/spt-util.yaml
