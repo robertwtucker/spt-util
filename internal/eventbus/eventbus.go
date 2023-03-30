@@ -9,6 +9,8 @@ package eventbus
 
 import (
 	"sync"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // Event holds the name of an event and its associated data.
@@ -21,6 +23,7 @@ type Event struct {
 // Done wraps the WaitGroup.Done() call.
 func (e *Event) Done() {
 	if e.wg != nil {
+		log.WithField("event", e.Name).Debug("marking event done")
 		e.wg.Done()
 	}
 }
@@ -79,8 +82,16 @@ func (eb *EventBus) PublishEvent(name string, data interface{}) {
 	eb.mutex.RLock()
 	defer eb.mutex.RUnlock()
 
+	log.WithFields(log.Fields{
+		"event":       name,
+		"subscribers": len(subscribers),
+	}).Debug("publishing event")
 	go func(eventChannels eventChannelSlice, event Event) {
-		for _, ec := range eventChannels {
+		for i, ec := range eventChannels {
+			log.WithFields(log.Fields{
+				"event": event.Name,
+				"chan":  ec,
+			}).Debugf("sending event to subscriber[%d]", i+1)
 			ec <- event
 		}
 	}(subscribers, Event{Data: data, Name: name, wg: &wg})
@@ -91,6 +102,11 @@ func (eb *EventBus) PublishEvent(name string, data interface{}) {
 // SubscribeEvent returns an EventChannel subscribed to the named Event.
 func (eb *EventBus) SubscribeEvent(name string) EventChannel {
 	ec := NewEventChannel()
+
+	log.WithFields(log.Fields{
+		"event": name,
+		"chan":  ec,
+	}).Debug("subscribing to event")
 	eb.SubscribeEventChannel(ec, name)
 
 	return ec
@@ -100,9 +116,20 @@ func (eb *EventBus) SubscribeEvent(name string) EventChannel {
 func (eb *EventBus) SubscribeEventCallback(name string, callback CallbackFunction) {
 	ec := eb.SubscribeEvent(name)
 
+	log.WithFields(log.Fields{
+		"event": name,
+		"chan":  ec,
+	}).Debug("set event callback")
+
 	go func(callback CallbackFunction) {
 		event := <-ec
+		log.WithFields(log.Fields{
+			"event": name,
+			"chan":  ec,
+		}).Debug("received event")
 		defer event.Done()
+
+		log.WithField("chan", ec).Debug("executing callback")
 		callback(event.Name, event.Data)
 	}(callback)
 }
@@ -113,8 +140,16 @@ func (eb *EventBus) SubscribeEventChannel(ec EventChannel, name string) {
 	defer eb.mutex.Unlock()
 
 	if subscribers, found := eb.subscribers[name]; found {
+		log.WithFields(log.Fields{
+			"event": name,
+			"chan":  ec,
+		}).Debug("adding subcriber (existing event)")
 		eb.subscribers[name] = append(subscribers, ec)
 	} else {
+		log.WithFields(log.Fields{
+			"event": name,
+			"chan":  ec,
+		}).Debug("adding subcriber (new event)")
 		eb.subscribers[name] = append(eventChannelSlice{}, ec)
 	}
 }
