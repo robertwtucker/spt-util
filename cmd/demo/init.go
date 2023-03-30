@@ -24,6 +24,7 @@ import (
 	"github.com/go-http-utils/headers"
 	"github.com/pkg/errors"
 	"github.com/robertwtucker/spt-util/internal/config"
+	"github.com/robertwtucker/spt-util/internal/eventbus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -45,246 +46,453 @@ spt-util demo init -d
 	},
 }
 
-type WorkflowsResponse struct {
-	Workflows []struct {
-		ID            string `json:"id"`
-		Name          string `json:"name"`
-		Path          string `json:"path"`
-		Status        string `json:"status"`
-		WorkflowGroup string `json:"workflowGroup"`
-	} `json:"workflows"`
+type EventData struct {
+	AuthHeader            string   `json:"authHeader"`
+	ChsFilePath           string   `json:"chsFilePath"`
+	EnvFilePath           string   `json:"envFilePath"`
+	Namespace             string   `json:"namespace"`
+	Release               string   `json:"release"`
+	ScalerHost            string   `json:"scalerHost"`
+	StartingWorkflowCount int      `json:"startingWorkflowCount"`
+	TargetWorkflowNames   []string `json:"targetWorkflowNames"`
+	WorkflowsToDeploy     []Workflow
 }
 
-// TODO: Refactor long function.
-//
-//nolint:funlen,gocognit,gomnd,noctx	// See: https://github.com/robertwtucker/spt-util/issues/11
+type WorkflowsResponse struct {
+	Workflows []Workflow `json:"workflows"`
+}
+
+type Workflow struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Path          string `json:"path"`
+	Status        string `json:"status"`
+	WorkflowGroup string `json:"workflowGroup"`
+}
+
+// Orchestrates the initialization of a new demo environment.
 func doInit() {
 	log.Info("starting demo environment initialization")
 
-	//
-	//  Setup
-	release := viper.GetString(config.GlobalReleaseKey)
-	log.WithField("release", release).Debug()
-	namespace := viper.GetString(config.GlobalNamespaceKey)
-	log.WithField("namespace", namespace).Debug()
-	scalerHost := viper.GetString(config.DemoServerKey)
-	log.WithField("scalerHost", scalerHost).Info()
-	authEncoding := getBasicAuthEncoding(
-		viper.GetString(config.DemoUsernameKey),
-		viper.GetString(config.DemoPasswordKey),
+	// Setup context data
+	var data = &EventData{
+		AuthHeader: fmt.Sprintf(
+			"Basic %s",
+			getBasicAuthEncoding(
+				viper.GetString(config.DemoUsernameKey),
+				viper.GetString(config.DemoPasswordKey),
+			),
+		),
+		ChsFilePath:         viper.GetString(config.DemoInitChsFileKey),
+		EnvFilePath:         viper.GetString(config.DemoInitEnvFileKey),
+		Namespace:           viper.GetString(config.GlobalNamespaceKey),
+		Release:             viper.GetString(config.GlobalReleaseKey),
+		ScalerHost:          viper.GetString(config.DemoServerKey),
+		TargetWorkflowNames: viper.GetStringSlice(config.DemoInitWorkflowsKey),
+		WorkflowsToDeploy:   []Workflow{},
+	}
+	data.StartingWorkflowCount = getScalerWorkflowCount(data.ScalerHost, data.AuthHeader)
+	log.WithField("data", data).Debug("initial event data")
+
+	// Create an EventBus instance
+	eb := eventbus.NewEventBus()
+
+	// Create event subscriptions
+	chEnv := eb.SubscribeEvent(eventbus.InitStart)
+	chChs := eb.SubscribeEvent(eventbus.InitStart)
+	chFind := eb.SubscribeEvent(eventbus.InitFindScalerWorkflows)
+	chDeploy := eb.SubscribeEvent(eventbus.InitDeployScalerWorkflows)
+
+	// Start goroutines that receive the triggering events
+	go importIcmEnvFile(chEnv, eb)         // <-InitStart
+	go uploadIcmChangeSet(chChs, eb)       // <-InitStart
+	go findScalerWorkflows(chFind, eb)     // <-InitFindScalerWorkflows
+	go deployScalerWorkflows(chDeploy, eb) // <-InitDeployScalerWorkflows
+
+	// Serialize our data and publish the initial event
+	jsonData, _ := json.Marshal(data)
+	log.Debug("publishing start event")
+	eb.PublishEvent(eventbus.InitStart, jsonData)
+
+	log.Info("ending demo environment initialization")
+}
+
+// Import the base set of ICM environment variables.
+func importIcmEnvFile(channel eventbus.EventChannel, _ *eventbus.EventBus) {
+	event := <-channel
+	log.WithField(
+		"event", event.Name,
+	).Debug("received event in importIcmEnvFile")
+	defer event.Done()
+
+	data := EventData{}
+	if eventData, ok := event.Data.([]byte); ok {
+		_ = json.Unmarshal(eventData, &data)
+	} else {
+		log.Error("error decoding event data: not []byte")
+		return
+	}
+
+	log.WithField(
+		"path", data.EnvFilePath,
+	).Debug("reading environment file content")
+	envFileContent, err := os.ReadFile(data.EnvFilePath)
+	if err != nil {
+		log.Error("unable to read environment file: ", err)
+		return
+	}
+
+	// request
+	// PUT {{baseUrl}}/api/content/v1/inspireEnvironments
+	request, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodPut,
+		fmt.Sprintf(
+			"%s/%s",
+			data.ScalerHost,
+			"api/content/v1/inspireEnvironments",
+		),
+		bytes.NewBuffer(envFileContent),
 	)
-	authHeader := fmt.Sprintf("Basic %s", authEncoding)
-	client := &http.Client{Timeout: time.Second * 5}
-
-	//
-	//  Import ICM environment variables
-	//  PUT {{baseUrl}}/api/content/v1/inspireEnvironments
-	url := fmt.Sprintf("%s/%s", scalerHost, "api/content/v1/inspireEnvironments")
-	envFilePath := viper.GetString(config.DemoInitEnvFileKey)
-	log.WithField("envFilePath", envFilePath).Debug("reading environment file content")
-	envFileContent, err := os.ReadFile(envFilePath)
 	if err != nil {
-		log.Fatalf("error reading environment file: %s", err)
-	}
-	// request
-	importEnvRequest, err := http.NewRequest(http.MethodPut, url, bytes.NewBuffer(envFileContent))
-	if err != nil {
-		log.Fatalf("error creating import environment request: %s", err)
-	}
-	log.WithFields(log.Fields{
-		"method": importEnvRequest.Method,
-		"url":    importEnvRequest.URL,
-	}).Debug("created import environment request")
-	importEnvRequest.Header.Set(headers.Accept, "application/json")
-	importEnvRequest.Header.Set(headers.Authorization, authHeader)
-	importEnvRequest.Header.Set(headers.ContentType, "application/json")
-	// response
-	log.Info("importing ICM environment settings")
-	importEnvResponse, err := client.Do(importEnvRequest)
-	if err != nil {
-		log.Fatalf("error sending import environment request: %s", err)
-	}
-	defer func() { _ = importEnvResponse.Body.Close }()
-	// process
-	if importEnvResponse.StatusCode >= http.StatusBadRequest {
-		respBody, _ := io.ReadAll(importEnvResponse.Body)
-		//nolint:gocritic // suppress lint error
-		log.Fatalf("error: import env request returned non-ok status: %d-%s",
-			importEnvResponse.StatusCode, string(respBody),
-		)
-	}
-	log.Info("ICM environment settings imported successfully")
-
-	//
-	//  Get starting list of Scaler workflows so we can know when the changeset is available
-	workflowsResponse, err := getWorkflows(client, scalerHost, authHeader)
-	if err != nil {
-		log.Fatalf("error getting workflows: %s", err)
-	}
-	startingWorkflowsCount := len(workflowsResponse.Workflows)
-	log.Debugf("starting workflow count: %d", startingWorkflowsCount)
-
-	//
-	//  Import changeset w/workflows for rest of process
-	//  {{baseUrl}}/api/content/v1/upload/changesets (multipart/form-data)
-	url = fmt.Sprintf("%s/%s", scalerHost, "api/content/v1/upload/changesets")
-	chsFilePath := viper.GetString(config.DemoInitChsFileKey)
-	// request
-	importChangesetRequest, err := newFileUploadRequest(url, chsFilePath)
-	if err != nil {
-		log.Fatalf("error creating import changeset request: %s", err)
-	}
-	log.WithFields(log.Fields{
-		"method": importChangesetRequest.Method,
-		"url":    importChangesetRequest.URL,
-	}).Debug("created import changeset request")
-	importChangesetRequest.Header.Set(headers.Authorization, authHeader)
-	// response
-	log.Info("sending import changeset request")
-	importChangesetResponse, err := client.Do(importChangesetRequest)
-	if err != nil {
-		log.Fatalf("error sending import changeset request: %s", err)
-	}
-	defer func() { _ = importChangesetResponse.Body.Close }()
-	// process
-	if importChangesetResponse.StatusCode >= http.StatusBadRequest {
-		respBody, _ := io.ReadAll(importChangesetResponse.Body)
-		log.Fatalf("error: import changeset request returned non-ok status: %s", string(respBody))
-	}
-	log.Info("workflow changeset imported successfully")
-
-	//
-	//  Find required workflows (loop until changeset is applied)
-	//  GET {{baseUrl}}/api/integration/v2/workflows/
-	var currentWorkflowsCount = startingWorkflowsCount
-	var tries = 0
-	for {
-		if tries > 15 {
-			log.Fatal("Exceeded try count waiting for workflows")
-		}
-		if currentWorkflowsCount > startingWorkflowsCount {
-			log.Info("changeset workflows applied successfully")
-			break
-		}
-		time.Sleep(4 * time.Second)
-		workflowsResponse, err = getWorkflows(client, scalerHost, authHeader)
-		if err != nil {
-			log.Fatalf("error getting workflows: %s", err)
-		}
-		currentWorkflowsCount = len(workflowsResponse.Workflows)
-		log.Infof("current workflow count: %d", currentWorkflowsCount)
-		tries++
-	}
-
-	// Find the IDs of the SPT workflows
-	targetWorkflows := viper.GetStringSlice(config.DemoInitWorkflowsKey)
-	numTargetWorkflows := sort.StringSlice.Len(targetWorkflows)
-	log.Debug("# target workflows: ", numTargetWorkflows)
-	if numTargetWorkflows > 1 {
-		sort.StringSlice(targetWorkflows).Sort()
-	}
-	log.Debug("target workflows:", targetWorkflows)
-	var foundWorkflows = make([]string, numTargetWorkflows)
-	for i, workflow := range workflowsResponse.Workflows {
-		if index := sort.SearchStrings(targetWorkflows, workflow.Name); index < numTargetWorkflows {
-			if workflow.Name == targetWorkflows[index] {
-				log.WithFields(log.Fields{
-					"name": workflow.Name,
-					"id":   workflow.ID,
-				}).Debug("matched workflow")
-				foundWorkflows[i] = workflow.ID
-			}
-		}
-	}
-	log.Debug("# workflows found: ", sort.StringSlice.Len(foundWorkflows))
-	if sort.StringSlice.Len(foundWorkflows) == 0 {
-		log.Fatal("error: no workflows found to deploy!")
-	}
-
-	//
-	//  Deploy the required workflows
-	//  PATCH {{baseUrl}}/api/integration/v2/workflows/{id}/
-	for _, id := range foundWorkflows {
-		url = fmt.Sprintf("%s/%s/%s", scalerHost, "api/integration/v2/workflows", id)
-		requestBody, _ := json.Marshal(map[string]string{"status": "DEPLOYED"})
-		// request
-		//nolint:govet	// request is new assignment
-		request, err := http.NewRequest(http.MethodPatch, url, bytes.NewBuffer(requestBody))
-		if err != nil {
-			log.Fatalf("error creating workflow deployment request %s", err)
-		}
-		log.WithFields(log.Fields{
-			"method": request.Method,
-			"url":    request.URL,
-		}).Debug("workflow deployment request")
-		request.Header.Set(headers.Accept, "application/json")
-		request.Header.Set(headers.Authorization, authHeader)
-		request.Header.Set(headers.ContentType, "application/json")
-		// response
-		log.WithField("id", id).Info("sending workflow deployment request")
-		response, err := client.Do(request)
-		if err != nil {
-			log.Fatalf("error sending deploy workflow request: %s", err)
-		}
-		// process
-		if response.StatusCode >= http.StatusBadRequest {
-			respBody, _ := io.ReadAll(response.Body)
-			log.WithField("responseBody", string(respBody)).Error("error deploying scaler workflow")
-		}
-		_ = response.Body.Close()
-		log.WithField("id", id).Info("workflow deployed successfully")
-	}
-
-	log.Info("completed demo environment initialization")
-}
-
-func getBasicAuthEncoding(user string, password string) string {
-	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", user, password)))
-}
-
-func getWorkflows(client *http.Client, scalerHost string, authHeader string) (WorkflowsResponse, error) {
-	//  List existing Scaler workflows
-	//  GET {{baseUrl}}/api/integration/v2/workflows/
-	url := fmt.Sprintf("%s/%s", scalerHost, "api/integration/v2/workflows")
-
-	// request
-	request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
-	if err != nil {
-		log.Error("error creating get workflows request: ", err)
-		return WorkflowsResponse{}, err
+		log.Error("failed to create import environment request: ", err)
+		return
 	}
 	log.WithFields(log.Fields{
 		"method": request.Method,
 		"url":    request.URL,
-	}).Debug("created workflows request")
-	request.Header.Set(headers.Authorization, authHeader)
+	}).Debug("created import environment request")
+	request.Header.Set(headers.Accept, "application/json")
+	request.Header.Set(headers.Authorization, data.AuthHeader)
+	request.Header.Set(headers.ContentType, "application/json")
 
 	// response
-	log.Info("sending workflows request")
+	log.Info("importing environment variables")
+	//nolint:gomnd // TODO: Externalize constant value in config file.
+	client := &http.Client{Timeout: time.Second * 5}
 	response, err := client.Do(request)
 	if err != nil {
-		log.Error("error sending workflows request: ", err)
-		return WorkflowsResponse{}, err
+		log.Error("failed to send import environment request: ", err)
+		return
 	}
 	defer func() { _ = response.Body.Close }()
 
 	// process
-	responseBody, _ := io.ReadAll(response.Body)
 	if response.StatusCode >= http.StatusBadRequest {
-		log.WithField("responseBody", string(responseBody)).Error("error: workflows request returned non-ok status")
-		return WorkflowsResponse{}, errors.New(string(responseBody))
-	}
-	// Serialize the response from JSON
-	var workflowsResponse WorkflowsResponse
-	log.Info("list of workflows received successfully")
-	if err = json.Unmarshal(responseBody, &workflowsResponse); err != nil {
-		log.WithField("error", err).Error("error processing JSON from workflows response")
-		return WorkflowsResponse{}, err
+		body, _ := io.ReadAll(response.Body)
+		log.Errorf(
+			"received non-ok HTTP status importing environment variables: [%d]:%s",
+			response.StatusCode,
+			string(body),
+		)
+		return
 	}
 
-	return workflowsResponse, nil
+	log.Info("environment variables imported successfully")
 }
 
+// Upload changeset w/workflows for rest of process.
+func uploadIcmChangeSet(channel eventbus.EventChannel, eb *eventbus.EventBus) {
+	event := <-channel
+	log.WithField(
+		"event", event.Name,
+	).Debug("received event in uploadIcmChangeSet")
+	defer event.Done()
+
+	data := EventData{}
+	if eventData, ok := event.Data.([]byte); ok {
+		_ = json.Unmarshal(eventData, &data)
+	} else {
+		log.Error("error decoding event data: not []byte")
+		return
+	}
+
+	// request
+	//  {{baseUrl}}/api/content/v1/upload/changesets (multipart/form-data)
+	url := fmt.Sprintf(
+		"%s/%s",
+		data.ScalerHost,
+		"api/content/v1/upload/changesets",
+	)
+	request, err := newFileUploadRequest(url, data.ChsFilePath)
+	if err != nil {
+		log.Error("error creating upload changeset request: ", err)
+		return
+	}
+	log.WithFields(log.Fields{
+		"method": request.Method,
+		"url":    request.URL,
+	}).Debug("created import changeset request")
+	request.Header.Set(headers.Authorization, data.AuthHeader)
+
+	// response
+	log.Info("uploading changeset")
+	//nolint:gomnd // TODO: Externalize constant value in config file.
+	client := &http.Client{Timeout: time.Second * 5}
+	response, err := client.Do(request)
+	if err != nil {
+		log.Error("error sending import changeset request: ", err)
+		return
+	}
+	defer func() { _ = response.Body.Close }()
+
+	// process
+	if response.StatusCode >= http.StatusBadRequest {
+		body, _ := io.ReadAll(response.Body)
+		log.Errorf(
+			"received non-ok HTTP status importing changeset: [%d]:%s",
+			response.StatusCode,
+			string(body),
+		)
+		return
+	}
+	log.Info("changeset uploaded successfully")
+
+	// Trigger (publish) the next event process. The serialized
+	// JSON hasn't changed, pass it as-is.
+	eb.PublishEvent(eventbus.InitFindScalerWorkflows, event.Data)
+}
+
+// Find required workflows in Scaler.
+func findScalerWorkflows(channel eventbus.EventChannel, eb *eventbus.EventBus) {
+	event := <-channel
+	log.WithField(
+		"event", event.Name,
+	).Debug("received event in findScalerWorkflows")
+	defer event.Done()
+
+	data := EventData{}
+	if eventData, ok := event.Data.([]byte); ok {
+		_ = json.Unmarshal(eventData, &data)
+	} else {
+		log.Error("error decoding event data: not []byte")
+		return
+	}
+
+	// Loop until changeset with needed workflows is applied.
+	currentWorkflowCount := data.StartingWorkflowCount
+	var tries = 0
+	for {
+		//nolint:gomnd // TODO: Externalize constant value in config file.
+		if tries > 15 {
+			log.Error("exceeded try count waiting for workflows to be applied")
+			return
+		}
+		if currentWorkflowCount > data.StartingWorkflowCount {
+			log.Info("changeset workflows have been applied")
+			break
+		}
+		currentWorkflowCount = getScalerWorkflowCount(data.ScalerHost, data.AuthHeader)
+		log.WithFields(log.Fields{
+			"workflows": currentWorkflowCount,
+			"retries":   tries,
+		}).Info("waiting for new workflows")
+		tries++
+		//nolint:gomnd // TODO: Externalize constant value in config file.
+		time.Sleep(4 * time.Second)
+	}
+
+	// Find the required workflows.
+	targetWorkflowNames := data.TargetWorkflowNames
+	targetWorkflowCount := sort.StringSlice.Len(targetWorkflowNames)
+	log.Debug("# target workflows: ", targetWorkflowCount)
+
+	// sort.SearchStrings() used below expects a sorted slice.
+	if targetWorkflowCount > 1 {
+		sort.StringSlice(targetWorkflowNames).Sort()
+	}
+
+	workflows, err := getScalerWorkflows(data.ScalerHost, data.AuthHeader)
+	if err != nil {
+		log.Error("failed to get workflows to inspect: ", err)
+	}
+
+	deployable := []Workflow{}
+	for _, workflow := range workflows {
+		if index := sort.SearchStrings(targetWorkflowNames, workflow.Name); index < targetWorkflowCount {
+			if workflow.Name == targetWorkflowNames[index] {
+				log.WithFields(log.Fields{
+					"name": workflow.Name,
+					"id":   workflow.ID,
+				}).Debug("matched workflow")
+				if len(deployable) == 0 {
+					deployable = []Workflow{workflow}
+				} else {
+					deployable = append(deployable, workflow)
+				}
+			}
+		}
+	}
+
+	workflowsToDeployCount := len(deployable)
+	log.Debug("# workflows found: ", workflowsToDeployCount)
+
+	// Add workflows to our data structure.
+	data.WorkflowsToDeploy = deployable
+	// Re-marshal the data into JSON.
+	jsonData, _ := json.Marshal(data)
+
+	// Trigger (publish) the next event process..
+	eb.PublishEvent(eventbus.InitDeployScalerWorkflows, jsonData)
+}
+
+// Deploy the required workflows in Scaler.
+func deployScalerWorkflows(channel eventbus.EventChannel, _ *eventbus.EventBus) {
+	event := <-channel
+	log.WithField(
+		"event", event.Name,
+	).Debug("received event in deployScalerWorkflows")
+	defer event.Done()
+
+	data := EventData{}
+	if eventData, ok := event.Data.([]byte); ok {
+		_ = json.Unmarshal(eventData, &data)
+	} else {
+		log.Error("event data not []byte format")
+		return
+	}
+
+	jsonBody, _ := json.Marshal(map[string]string{"status": "DEPLOYED"})
+
+	for _, workflow := range data.WorkflowsToDeploy {
+		// request
+		// PATCH {{baseUrl}}/api/integration/v2/workflows/{id}/
+		request, err := http.NewRequestWithContext(
+			context.Background(),
+			http.MethodPatch,
+			fmt.Sprintf(
+				"%s/%s/%s",
+				data.ScalerHost,
+				"api/integration/v2/workflows",
+				workflow.ID,
+			),
+			bytes.NewBuffer(jsonBody),
+		)
+		if err != nil {
+			log.Error("failed to create workflow deployment request: ", err)
+			continue
+		}
+		log.WithFields(log.Fields{
+			"method":   request.Method,
+			"url":      request.URL,
+			"workflow": workflow,
+		}).Debug("created workflow deployment request")
+		request.Header.Set(headers.Accept, "application/json")
+		request.Header.Set(headers.Authorization, data.AuthHeader)
+		request.Header.Set(headers.ContentType, "application/json")
+
+		// response
+		log.WithFields(log.Fields{
+			"id":   workflow.ID,
+			"name": workflow.Name,
+		}).Info("sending workflow deployment request")
+		//nolint:gomnd // TODO: Externalize constant value in config file.
+		client := &http.Client{Timeout: time.Second * 5}
+		response, err := client.Do(request)
+		if err != nil {
+			log.Error("failed to send workflow deployment request: ", err)
+			return
+		}
+		defer func() { _ = response.Body.Close() }()
+
+		// process
+		if response.StatusCode >= http.StatusBadRequest {
+			body, _ := io.ReadAll(response.Body)
+			log.WithFields(log.Fields{
+				"id":   workflow.ID,
+				"name": workflow.Name,
+			}).Errorf(
+				"received non-ok HTTP status deploying workflow: [%d]:%s",
+				response.StatusCode,
+				string(body),
+			)
+			continue
+		}
+		log.WithFields(log.Fields{
+			"id":   workflow.ID,
+			"name": workflow.Name,
+		}).Info("workflow deployed successfully")
+	}
+
+	log.Info("completed Scaler workflow deployment")
+}
+
+// getBasicAuthEncoding returns HTTP Basic auth encoding for
+// the given user and password.
+func getBasicAuthEncoding(user string, password string) string {
+	return base64.StdEncoding.EncodeToString(
+		[]byte(fmt.Sprintf("%s:%s", user, password)),
+	)
+}
+
+// Returns a count of workflows in Scaler.
+func getScalerWorkflowCount(scalerHost string, authHeader string) int {
+	var workflowCount int
+
+	workflows, err := getScalerWorkflows(scalerHost, authHeader)
+	if err != nil {
+		log.Error("failed to get workflow count: ", err)
+	} else {
+		workflowCount = len(workflows)
+	}
+
+	return workflowCount
+}
+
+// Returns a Workflow slice representing the workflows in Scaler.
+func getScalerWorkflows(scalerHost string, authHeader string) ([]Workflow, error) {
+	// request
+	// GET {{baseUrl}}/api/integration/v2/workflows/
+	request, err := http.NewRequestWithContext(
+		context.Background(),
+		http.MethodGet,
+		fmt.Sprintf("%s/%s", scalerHost, "api/integration/v2/workflows"),
+		nil,
+	)
+	if err != nil {
+		log.Error("failed to create list workflows request: ", err)
+		return []Workflow{}, err
+	}
+	log.WithFields(log.Fields{
+		"method": request.Method,
+		"url":    request.URL,
+	}).Debug("created list workflows request")
+	request.Header.Set(headers.Authorization, authHeader)
+
+	// response
+	log.Debug("sending list workflows request")
+	//nolint:gomnd // TODO: Externalize constant value in config file.
+	client := &http.Client{Timeout: time.Second * 5}
+	response, err := client.Do(request)
+	if err != nil {
+		log.Error("failed to send list workflows request: ", err)
+		return []Workflow{}, err
+	}
+	defer func() { _ = response.Body.Close }()
+
+	// process
+	body, _ := io.ReadAll(response.Body)
+	if response.StatusCode >= http.StatusBadRequest {
+		log.WithField("responseBody", string(body)).Errorf(
+			"received non-ok HTTP status listing workflows: [%d]:%s",
+			response.StatusCode,
+			string(body),
+		)
+		return []Workflow{}, errors.New(string(body))
+	}
+
+	// Deserialize the JSON response
+	workflowsResponse := WorkflowsResponse{}
+	log.Debug("received list of workflows")
+	if err = json.Unmarshal(body, &workflowsResponse); err != nil {
+		log.Error("failed to process JSON in list workflows response:", err)
+		return []Workflow{}, err
+	}
+
+	return workflowsResponse.Workflows, nil
+}
+
+// newFileUploadRequest is a helper for uploading files via HTTP.
 func newFileUploadRequest(uri string, path string) (*http.Request, error) {
 	log.WithField("path", path).Debug("reading upload file content")
 	file, err := os.Open(path)
