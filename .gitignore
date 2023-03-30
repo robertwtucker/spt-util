@@ -4,7 +4,6 @@
 *.test
 *.out
 chart
+tmp
 vendor
 
-# Ignore DevSpace cache and log folder
-.devspace/
