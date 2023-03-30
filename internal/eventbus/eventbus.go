@@ -72,6 +72,22 @@ func (eb *EventBus) HasSubscribers(name string) bool {
 	return len(eb.subscribers[name]) > 0
 }
 
+// publish sends an Event to subscribed channels ([]EventChannel).
+func (eb *EventBus) publish(channels []EventChannel, event Event) {
+	eb.mutex.RLock()
+	defer eb.mutex.RUnlock()
+
+	go func(channels []EventChannel, event Event) {
+		for i, channel := range channels {
+			log.WithFields(log.Fields{
+				"event": event.Name,
+				"chan":  channel,
+			}).Debugf("sending event to subscriber[%d]", i+1)
+			channel <- event
+		}
+	}(channels, event)
+}
+
 // PublishEvent sends data to all named Event subscribers. It waits
 // for all subscribers to finish (each must call Done() on Event).
 func (eb *EventBus) PublishEvent(name string, data interface{}) {
@@ -79,24 +95,36 @@ func (eb *EventBus) PublishEvent(name string, data interface{}) {
 	subscribers := eb.getEventSubscribers(name)
 	wg.Add(len(subscribers))
 
-	eb.mutex.RLock()
-	defer eb.mutex.RUnlock()
+	log.WithFields(log.Fields{
+		"event":       name,
+		"subscribers": len(subscribers),
+		"mode":        "sync",
+	}).Debug("publishing event")
+	eb.publish(subscribers, Event{Data: data, Name: name, wg: &wg})
 
 	log.WithFields(log.Fields{
 		"event":       name,
 		"subscribers": len(subscribers),
-	}).Debug("publishing event")
-	go func(eventChannels eventChannelSlice, event Event) {
-		for i, ec := range eventChannels {
-			log.WithFields(log.Fields{
-				"event": event.Name,
-				"chan":  ec,
-			}).Debugf("sending event to subscriber[%d]", i+1)
-			ec <- event
-		}
-	}(subscribers, Event{Data: data, Name: name, wg: &wg})
-
+	}).Debug("waiting for subscribers to finish")
 	wg.Wait()
+
+	log.WithField("event", name).Debug("subscribers have finished")
+}
+
+// PublishEventAsync sends data to all named Event subscribers
+// asynchronously. Subscribers are expected to manage their lifecycle.
+func (eb *EventBus) PublishEventAsync(name string, data interface{}) {
+	subscribers := eb.getEventSubscribers(name)
+
+	log.WithFields(log.Fields{
+		"event":       name,
+		"subscribers": len(subscribers),
+		"mode":        "async",
+	}).Debug("publishing event")
+	eb.publish(
+		subscribers,
+		Event{Data: data, Name: name, wg: nil},
+	)
 }
 
 // SubscribeEvent returns an EventChannel subscribed to the named Event.
@@ -140,16 +168,14 @@ func (eb *EventBus) SubscribeEventChannel(ec EventChannel, name string) {
 	defer eb.mutex.Unlock()
 
 	if subscribers, found := eb.subscribers[name]; found {
-		log.WithFields(log.Fields{
-			"event": name,
-			"chan":  ec,
-		}).Debug("adding subcriber (existing event)")
 		eb.subscribers[name] = append(subscribers, ec)
 	} else {
-		log.WithFields(log.Fields{
-			"event": name,
-			"chan":  ec,
-		}).Debug("adding subcriber (new event)")
 		eb.subscribers[name] = append(eventChannelSlice{}, ec)
 	}
+
+	log.WithFields(log.Fields{
+		"event":       name,
+		"chan":        ec,
+		"subscribers": len(eb.subscribers[name]),
+	}).Debug("added subcriber")
 }
