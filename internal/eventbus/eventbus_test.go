@@ -8,6 +8,7 @@
 package eventbus_test
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/robertwtucker/spt-util/internal/eventbus"
@@ -61,6 +62,27 @@ func TestEventBus_PublishEvent(t *testing.T) {
 	}()
 
 	eb.PublishEvent(eventName, eventData)
+}
+
+func TestEventBus_PublishEventAsync(t *testing.T) {
+	eventName := "foo"
+	eventData := "bar"
+
+	eb := eventbus.NewEventBus()
+	ec := eb.SubscribeEvent(eventName)
+
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		event := <-ec
+		assert.Equal(t, eventName, event.Name)
+		assert.Equal(t, eventData, event.Data)
+		wg.Done()
+	}()
+
+	eb.PublishEventAsync(eventName, eventData)
+	wg.Wait()
 }
 
 func TestEventBus_SubscribeEventCallback(t *testing.T) {
