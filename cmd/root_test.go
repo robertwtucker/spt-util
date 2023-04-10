@@ -13,6 +13,6 @@ import (
 	"github.com/robertwtucker/spt-util/cmd"
 )
 
-func TestRoot(t *testing.T) {
+func TestRoot(_ *testing.T) {
 	cmd.Execute()
 }
