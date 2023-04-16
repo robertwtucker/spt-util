@@ -14,7 +14,7 @@ LINT_TOOL=$(shell go env GOPATH)/bin/golangci-lint
 # Build
 VERSION=$(shell git describe --tags --always | sed 's/v//;s/-.*//')
 REVISION=$(shell git rev-parse --short=7 HEAD)
-PACKAGE=${MODULE}/internal/config
+PACKAGE=${MODULE}/pkg/version
 OUTPUT_DIR=out
 BUILD_OUTPUT=${OUTPUT_DIR}/bin/${BINARY}
 
@@ -23,7 +23,7 @@ all: help
 
 ## Build:
 PLATFORMS := linux/${GOARCH} darwin/${GOARCH} windows/${GOARCH}
-LDFLAGS = -ldflags "-X ${PACKAGE}.appVersion=${VERSION} -X ${PACKAGE}.revision=${REVISION}"
+LDFLAGS = -ldflags "-X ${PACKAGE}.version=${VERSION} -X ${PACKAGE}.revision=${REVISION}"
 
 temp=$(subst /, ,$@)
 os=$(word 1, $(temp))
