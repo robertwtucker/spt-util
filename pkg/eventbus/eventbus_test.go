@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/robertwtucker/spt-util/internal/eventbus"
+	"github.com/robertwtucker/spt-util/pkg/eventbus"
 	"github.com/stretchr/testify/assert"
 )
 

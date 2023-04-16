@@ -23,8 +23,8 @@ import (
 
 	"github.com/go-http-utils/headers"
 	"github.com/pkg/errors"
-	"github.com/robertwtucker/spt-util/internal/eventbus"
 	"github.com/robertwtucker/spt-util/pkg/constants"
+	"github.com/robertwtucker/spt-util/pkg/eventbus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
