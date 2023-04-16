@@ -13,7 +13,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/robertwtucker/spt-util/internal/config"
+	"github.com/robertwtucker/spt-util/pkg/constants"
 	"github.com/robertwtucker/spt-util/pkg/version"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
@@ -30,7 +30,7 @@ var rootCmdArgs struct {
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
-	Use:   config.AppName,
+	Use:   constants.AppName,
 	Short: "The SPT utility application",
 	Long: `
 The SPT utility application is used to execute the various scripts necessary to setup
@@ -67,7 +67,7 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.ConfigFile, "config", "c",
-		"", "specify the config file (default is ./config/"+config.AppName+".yaml)")
+		"", "specify the config file (default is ./config/"+constants.AppName+".yaml)")
 	rootCmd.PersistentFlags().StringVar(&rootCmdArgs.LogFormat, "log-format",
 		"text", "set the logging format [text|json]")
 	rootCmd.PersistentFlags().BoolVarP(&rootCmdArgs.LogDebug, "verbose", "d",
@@ -89,7 +89,7 @@ func initConfig() {
 	} else {
 		viper.AddConfigPath("./config")
 		viper.SetConfigType("yaml")
-		viper.SetConfigName(config.AppName)
+		viper.SetConfigName(constants.AppName)
 	}
 
 	viper.AutomaticEnv() // read in environment variables that match
@@ -101,10 +101,10 @@ func initConfig() {
 
 	// Override config file settings with command line arguments, if present.
 	if rootCmdArgs.Release != "" {
-		viper.Set(config.GlobalReleaseKey, rootCmdArgs.Release)
+		viper.Set(constants.GlobalReleaseKey, rootCmdArgs.Release)
 	}
 	if rootCmdArgs.Namespace != "" {
-		viper.Set(config.GlobalNamespaceKey, rootCmdArgs.Namespace)
+		viper.Set(constants.GlobalNamespaceKey, rootCmdArgs.Namespace)
 	}
 }
 

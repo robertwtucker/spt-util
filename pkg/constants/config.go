@@ -5,32 +5,10 @@
 // 'LICENSE' file found in the root of this source code package.
 //
 
-package config
-
-import "fmt"
+package constants
 
 // AppName represents the name of the application.
 const AppName = "spt-util"
-
-//nolint:gochecknoglobals // used for build process
-var (
-	appVersion = "development"
-	revision   = "unknown"
-)
-
-// VersionInfo represents the application's latest version tag and Git revision.
-type VersionInfo struct {
-	Version  string `mapstructure:"version"`
-	Revision string `mapstructure:"revision"`
-}
-
-// AppVersion returns the application's latest version and Git revision.
-func AppVersion() VersionInfo { return VersionInfo{Version: appVersion, Revision: revision} }
-
-// String returns a formatted form of the version and revision.
-func (v VersionInfo) String() string {
-	return fmt.Sprintf("%s-%s", v.Version, v.Revision)
-}
 
 // Setting keys.
 const (

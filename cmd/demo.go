@@ -9,7 +9,7 @@ package cmd
 
 import (
 	"github.com/robertwtucker/spt-util/cmd/demo"
-	"github.com/robertwtucker/spt-util/internal/config"
+	"github.com/robertwtucker/spt-util/pkg/constants"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -33,9 +33,9 @@ spt-util demo stage -c <path-to-config.yaml>
 //nolint:gochecknoinits // required for proper cobra initialization.
 func init() {
 	// Get Scaler params from environment, not command line
-	_ = viper.BindEnv(config.DemoUsernameKey, config.DemoUsernameEnv)
-	_ = viper.BindEnv(config.DemoPasswordKey, config.DemoPasswordEnv)
-	_ = viper.BindEnv(config.DemoServerKey, config.DemoServerEnv)
+	_ = viper.BindEnv(constants.DemoUsernameKey, constants.DemoUsernameEnv)
+	_ = viper.BindEnv(constants.DemoPasswordKey, constants.DemoPasswordEnv)
+	_ = viper.BindEnv(constants.DemoServerKey, constants.DemoServerEnv)
 
 	demoCmd.AddCommand(demo.InitCmd)
 	demoCmd.AddCommand(demo.StageCmd)
