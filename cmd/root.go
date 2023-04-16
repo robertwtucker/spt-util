@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"github.com/robertwtucker/spt-util/internal/config"
+	"github.com/robertwtucker/spt-util/pkg/version"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -47,7 +48,7 @@ spt-util --version
 	`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		initLog()
-		logrus.WithField("version", config.AppVersion().String()).Info("initialized")
+		logrus.WithField("version", version.GetVersion()).Info("initialized")
 		return nil
 	},
 }
@@ -76,7 +77,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVarP(&rootCmdArgs.Namespace, "namespace", "n",
 		"default", "set the cluster namespace to target")
 
-	rootCmd.Version = config.AppVersion().String()     // Enable the version option
+	rootCmd.Version = version.GetVersion()             // Enable the version option
 	rootCmd.CompletionOptions.DisableDefaultCmd = true // Hide the completion options
 }
 
