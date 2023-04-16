@@ -9,7 +9,7 @@ package demo
 
 import (
 	cp "github.com/otiai10/copy"
-	"github.com/robertwtucker/spt-util/internal/config"
+	"github.com/robertwtucker/spt-util/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -27,7 +27,7 @@ Stages files and directories for a demo instance
 spt-util demo stage -c <path-to-config.yaml>
 	`,
 	Run: func(cmd *cobra.Command, args []string) {
-		log.Debugf("release: %s", viper.GetString(config.GlobalReleaseKey))
+		log.Debugf("release: %s", viper.GetString(constants.GlobalReleaseKey))
 		doStage()
 	},
 }
@@ -41,7 +41,7 @@ func doStage() {
 	log.Info("starting demo environment file staging")
 
 	var files []FilesToCopy
-	err := viper.UnmarshalKey(config.DemoStageFilesKey, &files)
+	err := viper.UnmarshalKey(constants.DemoStageFilesKey, &files)
 	if err != nil {
 		log.Fatal("error getting config file values")
 	}

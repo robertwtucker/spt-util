@@ -23,8 +23,8 @@ import (
 
 	"github.com/go-http-utils/headers"
 	"github.com/pkg/errors"
-	"github.com/robertwtucker/spt-util/internal/config"
 	"github.com/robertwtucker/spt-util/internal/eventbus"
+	"github.com/robertwtucker/spt-util/pkg/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -79,16 +79,16 @@ func doInit() {
 		AuthHeader: fmt.Sprintf(
 			"Basic %s",
 			getBasicAuthEncoding(
-				viper.GetString(config.DemoUsernameKey),
-				viper.GetString(config.DemoPasswordKey),
+				viper.GetString(constants.DemoUsernameKey),
+				viper.GetString(constants.DemoPasswordKey),
 			),
 		),
-		ChsFilePath:         viper.GetString(config.DemoInitChsFileKey),
-		EnvFilePath:         viper.GetString(config.DemoInitEnvFileKey),
-		Namespace:           viper.GetString(config.GlobalNamespaceKey),
-		Release:             viper.GetString(config.GlobalReleaseKey),
-		ScalerHost:          viper.GetString(config.DemoServerKey),
-		TargetWorkflowNames: viper.GetStringSlice(config.DemoInitWorkflowsKey),
+		ChsFilePath:         viper.GetString(constants.DemoInitChsFileKey),
+		EnvFilePath:         viper.GetString(constants.DemoInitEnvFileKey),
+		Namespace:           viper.GetString(constants.GlobalNamespaceKey),
+		Release:             viper.GetString(constants.GlobalReleaseKey),
+		ScalerHost:          viper.GetString(constants.DemoServerKey),
+		TargetWorkflowNames: viper.GetStringSlice(constants.DemoInitWorkflowsKey),
 		WorkflowsToDeploy:   []Workflow{},
 	}
 	data.StartingWorkflowCount = getScalerWorkflowCount(data.ScalerHost, data.AuthHeader)
