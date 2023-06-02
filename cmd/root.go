@@ -33,8 +33,8 @@ var rootCmd = &cobra.Command{
 	Use:   constants.AppName,
 	Short: "The SPT utility application",
 	Long: `
-The SPT utility application is used to execute the various scripts necessary to setup
-and maintain SPT demo environments.
+The SPT utility application is used to execute scripts that set up and
+maintain SPT demo environments.
 	`,
 	Example: `
 # initialize base content for a demo environment with debug logging enabled
