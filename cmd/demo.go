@@ -8,7 +8,6 @@
 package cmd
 
 import (
-	"github.com/robertwtucker/spt-util/cmd/demo"
 	"github.com/robertwtucker/spt-util/pkg/constants"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -37,7 +36,5 @@ func init() {
 	_ = viper.BindEnv(constants.DemoPasswordKey, constants.DemoPasswordEnv)
 	_ = viper.BindEnv(constants.DemoServerKey, constants.DemoServerEnv)
 
-	demoCmd.AddCommand(demo.InitCmd)
-	demoCmd.AddCommand(demo.StageCmd)
 	rootCmd.AddCommand(demoCmd)
 }

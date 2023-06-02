@@ -5,7 +5,7 @@
 // 'LICENSE' file found in the root of this source code package.
 //
 
-package demo
+package cmd
 
 import (
 	"bytes"
@@ -30,20 +30,16 @@ import (
 	"github.com/spf13/viper"
 )
 
-// InitCmd represents the init command.
-var InitCmd = &cobra.Command{
-	Use:   "init",
-	Short: "Initializes a demo instance",
-	Long: `
-Initializes a demo instance given the specified release and namespace.
-    `,
-	Example: `
-# initialize base content for a demo environment with debug logging enabled
-spt-util demo init -d
-	`,
-	Run: func(cmd *cobra.Command, args []string) {
-		doInit()
-	},
+type Workflow struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Path          string `json:"path"`
+	Status        string `json:"status"`
+	WorkflowGroup string `json:"workflowGroup"`
+}
+
+type WorkflowsResponse struct {
+	Workflows []Workflow `json:"workflows"`
 }
 
 type EventData struct {
@@ -58,63 +54,67 @@ type EventData struct {
 	WorkflowsToDeploy     []Workflow
 }
 
-type WorkflowsResponse struct {
-	Workflows []Workflow `json:"workflows"`
-}
+// initCmd represents the init command.
+var initCmd = &cobra.Command{
+	Use:   "init",
+	Short: "Initializes a demo instance",
+	Long: `
+Initializes a demo instance given the specified release and namespace.
+    `,
+	Example: `
+# initialize base content for a demo environment with debug logging enabled
+spt-util demo init -d
+	`,
+	Run: func(cmd *cobra.Command, args []string) {
+		log.Info("starting demo environment initialization")
 
-type Workflow struct {
-	ID            string `json:"id"`
-	Name          string `json:"name"`
-	Path          string `json:"path"`
-	Status        string `json:"status"`
-	WorkflowGroup string `json:"workflowGroup"`
-}
-
-// Orchestrates the initialization of a new demo environment.
-func doInit() {
-	log.Info("starting demo environment initialization")
-
-	// Setup context data
-	var data = &EventData{
-		AuthHeader: fmt.Sprintf(
-			"Basic %s",
-			getBasicAuthEncoding(
-				viper.GetString(constants.DemoUsernameKey),
-				viper.GetString(constants.DemoPasswordKey),
+		// Setup context data
+		var data = &EventData{
+			AuthHeader: fmt.Sprintf(
+				"Basic %s",
+				getBasicAuthEncoding(
+					viper.GetString(constants.DemoUsernameKey),
+					viper.GetString(constants.DemoPasswordKey),
+				),
 			),
-		),
-		ChsFilePath:         viper.GetString(constants.DemoInitChsFileKey),
-		EnvFilePath:         viper.GetString(constants.DemoInitEnvFileKey),
-		Namespace:           viper.GetString(constants.GlobalNamespaceKey),
-		Release:             viper.GetString(constants.GlobalReleaseKey),
-		ScalerHost:          viper.GetString(constants.DemoServerKey),
-		TargetWorkflowNames: viper.GetStringSlice(constants.DemoInitWorkflowsKey),
-		WorkflowsToDeploy:   []Workflow{},
-	}
-	data.StartingWorkflowCount = getScalerWorkflowCount(data.ScalerHost, data.AuthHeader)
-	log.WithField("data", data).Debug("initial event data")
+			ChsFilePath:         viper.GetString(constants.DemoInitChsFileKey),
+			EnvFilePath:         viper.GetString(constants.DemoInitEnvFileKey),
+			Namespace:           viper.GetString(constants.GlobalNamespaceKey),
+			Release:             viper.GetString(constants.GlobalReleaseKey),
+			ScalerHost:          viper.GetString(constants.DemoServerKey),
+			TargetWorkflowNames: viper.GetStringSlice(constants.DemoInitWorkflowsKey),
+			WorkflowsToDeploy:   []Workflow{},
+		}
+		data.StartingWorkflowCount = getScalerWorkflowCount(data.ScalerHost, data.AuthHeader)
+		log.WithField("data", data).Debug("initial event data")
 
-	// Create an EventBus instance
-	eb := eventbus.NewEventBus()
+		// Create an EventBus instance
+		eb := eventbus.NewEventBus()
 
-	// Create event subscriptions
-	chEnv := eb.SubscribeEvent(eventbus.InitStart)
-	chChs := eb.SubscribeEvent(eventbus.InitStart)
-	chFind := eb.SubscribeEvent(eventbus.InitFindScalerWorkflows)
-	chDeploy := eb.SubscribeEvent(eventbus.InitDeployScalerWorkflows)
+		// Create event subscriptions
+		chEnv := eb.SubscribeEvent(eventbus.InitStart)
+		chChs := eb.SubscribeEvent(eventbus.InitStart)
+		chFind := eb.SubscribeEvent(eventbus.InitFindScalerWorkflows)
+		chDeploy := eb.SubscribeEvent(eventbus.InitDeployScalerWorkflows)
 
-	// Start goroutines that receive the triggering events
-	go importIcmEnvFile(chEnv, eb)         // <-InitStart
-	go uploadIcmChangeSet(chChs, eb)       // <-InitStart
-	go findScalerWorkflows(chFind, eb)     // <-InitFindScalerWorkflows
-	go deployScalerWorkflows(chDeploy, eb) // <-InitDeployScalerWorkflows
+		// Start goroutines that receive the triggering events
+		go importIcmEnvFile(chEnv, eb)         // <-InitStart
+		go uploadIcmChangeSet(chChs, eb)       // <-InitStart
+		go findScalerWorkflows(chFind, eb)     // <-InitFindScalerWorkflows
+		go deployScalerWorkflows(chDeploy, eb) // <-InitDeployScalerWorkflows
 
-	// Serialize our data and publish the initial event
-	jsonData, _ := json.Marshal(data)
-	log.Debug("publishing start event")
-	eb.PublishEvent(eventbus.InitStart, jsonData)
+		// Serialize our data and publish the initial event
+		jsonData, _ := json.Marshal(data)
+		log.Debug("publishing start event")
+		eb.PublishEvent(eventbus.InitStart, jsonData)
 
-	log.Info("ending demo environment initialization")
+		log.Info("ending demo environment initialization")
+	},
+}
+
+//nolint:gochecknoinits // required for proper cobra initialization.
+func init() {
+	demoCmd.AddCommand(initCmd)
 }
 
 // Import the base set of ICM environment variables.
