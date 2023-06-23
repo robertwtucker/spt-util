@@ -1,4 +1,4 @@
-FROM golang:1.20.2-bullseye AS build-env
+FROM golang:1.20.5-bullseye AS build-env
 
 ARG VERSION=development
 ARG REVISION=unset
